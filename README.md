@@ -136,6 +136,7 @@ LLM 연동 내외부 문서 질의 응답 시스템
 # 5. 결과
 - 질문
 <img width="299" alt="image" src="https://github.com/user-attachments/assets/1047d596-55c6-4dbb-86aa-445476f52614" />
+
 - 답변
 <img width="305" alt="image" src="https://github.com/user-attachments/assets/34e13665-dc5c-4ebf-a79c-fe8cbebbc3be" />
 <br><br><br>
