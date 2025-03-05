@@ -60,18 +60,18 @@ SKN08-3rd-1Team
 # 2. Introduction Project (프로젝트 개요)
 
 ### ✅프로젝트 명
-LLM 연동 내외부 문서 질의 응답 시스템
+응급처치 정보 제공 챗봇
 
 ### ✅프로젝트 소개
-파인튜닝을 통해 LLM으로부터 질의응답 확인 
+응급 상황에서 어떻게 대처해야 할지 몰라 막막했던 경험이 있으셨나요?
+이 챗봇은 실생활에서 발생할 수 있는 다양한 응급 상황에 대해 신뢰할 수 있는 정보를 제공합니다.
+공식 의료 데이터와 LLM을 연동하고 파인튜닝하여 보다 정확하고 적절한 응급처치 안내를 제공합니다.
 
 ### ✅프로젝트 목표
-- 데이터 수집
-- 데이터 학습을 위한 모델 설정
-- 데이터 학습
-- 유의미한 결론 도출
-- README.md 작성 
+응급의료포털 E-GEN, 질병관리청 국가건강정보포털, 국민재난안전포털의 데이터를 활용해 LLM 기반 응급처치 질의응답 시스템을 구축합니다.
+이 과정에서 모델을 설정하고 데이터를 학습하며, RAG 방식을 적용해 보다 신뢰도 높은 응답을 생성합니다.
 <br><br><br>
+
 
 
 
@@ -109,27 +109,168 @@ LLM 연동 내외부 문서 질의 응답 시스템
   
   ## **Preprocessing**
   
-  ### 1. 사전학습 모델 선택
-  - 데이터셋에 적합한 학습모델을 선택합니다.
+  ### 1. 데이터 수집
+- 크롤링을 통해 응급처치 데이터 수집 진행
+- Json으로 파일 저장
+
+```python
+import requests
+from bs4 import BeautifulSoup
+import json
+
+url = "https://www.e-gen.or.kr/egen/first_aid_data.do"
+headers = {"User-Agent": "Mozilla/5.0"}
+response = requests.get(url, headers=headers)
+
+data = []
+if response.status_code == 200:
+    soup = BeautifulSoup(response.text, "html.parser")
+    articles = soup.find_all("div", class_="first-aid-item") 
+
+    for article in articles:
+        title = article.find("h3").text.strip()
+        content = article.find("p").text.strip()
+        data.append({"question": title, "answer": content})
+
+# Json 파일에 저장
+    with open("emergency_qa.json", "w", encoding="utf-8") as f: 
+        json.dump(data, f, ensure_ascii=False, indent=4)
+else:
+    print("페이지 요청 실패", response.status_code)
+```
+
+
+
+
+  ### 2. 파인튜닝 학습(KoAlpaca 기반 LLM 학습)
+  - KoAlpaca 등 오픈소스 LLM을 응급처치 QA 데이터로 추가 학습
+  - 이를 통해 챗봇이 응급처치 관련 질문에 더 정확한 답변을 제공
+
+```python
+from transformers import AutoModelForCausalLM, AutoTokenizer, Trainer, TrainingArguments
+import json
+
+# 모델 및 토크나이저 로드
+model_name = "beomi/KoAlpaca-7B" 
+tokenizer = AutoTokenizer.from_pretrained(model_name)
+model = AutoModelForCausalLM.from_pretrained(model_name)
+
+# 데이터 로드
+with open("emergency_qa.json", "r", encoding="utf-8") as f: 
+    data = json.load(f)
+
+# 데이터 토큰화
+train_data = [{"input_ids": tokenizer(q["question"], return_tensors="pt")["input_ids"], 
+               "labels": tokenizer(q["answer"], return_tensors="pt")["input_ids"]}
+              for q in data]
+
+# 학습 설정
+training_args = TrainingArguments(   
+    output_dir="./fine_tuned_model",
+    per_device_train_batch_size=4,
+    num_train_epochs=3,
+    save_steps=500,
+    logging_dir="./logs"
+)
+
+trainer = Trainer(
+    model=model,
+    args=training_args,
+    train_dataset=train_data
+)
+
+ # 학습 실행
+trainer.train()
+
+# 파인튜닝된 모델 저장
+model.save_pretrained("./fine_tuned_emergency_model")  
+tokenizer.save_pretrained("./fine_tuned_emergency_model")
+ ```
+
+
   
-  ### 2. 베이스모델에 대한 이해
-  - 사용하는 언어 모델에 대한 구조/강점/제약 사항들을 사전파악 후, 성능을 평가하여 파인튜닝 영역을 선정합니다.
+  ### 3. RAG(Faiss) 벡터 검색 구축
+  - SBERT를 사용해 응급처치 데이터를 벡터화하고 Faiss에 저장
+  - 사용자의 질문과 가장 유사한 응급처치 정보를 빠르게 검색 가능
+
+```python
+import faiss
+import numpy as np
+import json
+from sentence_transformers import SentenceTransformer
+
+# SBERT 기반 임베딩 모델 로드
+model = SentenceTransformer("snunlp/KR-SBERT-V40K-klueNLI-augSTS") 
+
+# 데이터 로드
+with open("emergency_qa.json", "r", encoding="utf-8") as f: 
+    data = json.load(f)
+
+# 임베딩 변환
+embeddings = np.array([model.encode(q["answer"]) for q in data]) 
+
+ # Faiss 인덱스 생성
+d = embeddings.shape[1]  
+index = faiss.IndexFlatL2(d)
+index.add(embeddings)
+
+# 저장
+faiss.write_index(index, "faiss_index.bin")  
+with open("texts.json", "w", encoding="utf-8") as f:
+    json.dump(data, f, ensure_ascii=False, indent=4)
+```
+
   
-  ### 3. 파인튜닝 전략 정의
-  - 작업 요구 사항 및 사용 가능한 리소스를 기반으로 적절한 파인튜닝 전략을 선택합니다.
   
-  ### 4. 데이터셋 준비
-  - 학습 데이터셋을 수집하고 준비합니다.
-  
-  ### 5. 모델 매개변수 초기화
-  - 사전 학습된 모델의 가중치를 기반으로 파인튜닝된 모델의 매개변수를 초기화합니다.
-  
-  ### 6. 하이퍼파라미터 설정
-  - 파인튜닝을 위한 하이퍼파라미터를 결정합니다. 
-  
-  ### 7. 파인튜닝 학습
-  - 준비한 데이터셋과 파인튜닝 전략을 사용하여 모델을 훈련합니다.
-  - 학습 과정에서 설정된 하이퍼파라미터와 최적화된 알고리즘을 기반으로 모델 매개변수를 점진적으로 조정합니다.
+  ### 4. 최종 챗봇 생성 (LLM + RAG 결합) 
+  - 준비한 데이터셋과 파인튜닝 전략을 사용하여 모델을 훈련
+  - 학습 과정에서 설정된 하이퍼파라미터와 최적화된 알고리즘을 기반으로 모델 매개변수를 점진적으로 조정
+
+```python
+import faiss
+import numpy as np
+from transformers import AutoModelForCausalLM, AutoTokenizer
+from sentence_transformers import SentenceTransformer
+import json
+
+ # 모델 및 토크나이저 로드
+model_path = "./fine_tuned_emergency_model" 
+tokenizer = AutoTokenizer.from_pretrained(model_path)
+model = AutoModelForCausalLM.from_pretrained(model_path)
+
+# Faiss 인덱스 로드
+index = faiss.read_index("faiss_index.bin")  
+with open("texts.json", "r", encoding="utf-8") as f:
+    texts = json.load(f)
+
+# SBERT 임베딩 모델 로드
+embedding_model = SentenceTransformer("snunlp/KR-SBERT-V40K-klueNLI-augSTS")  
+
+
+def search_and_generate(query):
+    # 쿼리 벡터 변환
+    query_vector = embedding_model.encode(query).reshape(1, -1)
+    
+    # Faiss 검색 (최상위 3개 문서)
+    D, I = index.search(query_vector, k=3)
+    
+    # 검색된 문서들 연결
+    context = "\n".join([texts[i]["answer"] for i in I[0]])
+
+    # 모델 입력 프롬프트 생성
+    prompt = f"다음 정보를 참고하여 응급처치 질문에 답변하세요:\n\n{context}\n\n질문: {query}\n답변:"
+
+    # 모델 실행
+    input_ids = tokenizer(prompt, return_tensors="pt").input_ids
+    output = model.generate(input_ids, max_length=200, pad_token_id=tokenizer.eos_token_id)
+
+    return tokenizer.decode(output[0], skip_special_tokens=True)
+
+# 테스트
+query = "허리를 다치면 어떻게 해?"   
+print(search_and_generate(query))
+```
+
 <br><br><br>
 
 
