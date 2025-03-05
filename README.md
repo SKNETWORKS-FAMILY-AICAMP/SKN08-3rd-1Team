@@ -117,12 +117,10 @@ import requests
 from bs4 import BeautifulSoup
 import json
 
-# 크롤링할 URL
 url = "https://www.e-gen.or.kr/egen/first_aid_data.do"
 headers = {"User-Agent": "Mozilla/5.0"}
 response = requests.get(url, headers=headers)
 
-# HTML 파싱 및 데이터 수집
 data = []
 if response.status_code == 200:
     soup = BeautifulSoup(response.text, "html.parser")
@@ -133,8 +131,7 @@ if response.status_code == 200:
         content = article.find("p").text.strip()
         data.append({"question": title, "answer": content})
 
-    # JSON 파일 저장
-    with open("emergency_qa.json", "w", encoding="utf-8") as f:
+    with open("emergency_qa.json", "w", encoding="utf-8") as f: # Json 파일에 저장
         json.dump(data, f, ensure_ascii=False, indent=4)
 else:
     print("페이지 요청 실패", response.status_code)
@@ -150,22 +147,18 @@ else:
 from transformers import AutoModelForCausalLM, AutoTokenizer, Trainer, TrainingArguments
 import json
 
-# 모델 및 토크나이저 로드
-model_name = "beomi/KoAlpaca-7B"
+model_name = "beomi/KoAlpaca-7B" # 모델 및 토크나이저 로드
 tokenizer = AutoTokenizer.from_pretrained(model_name)
 model = AutoModelForCausalLM.from_pretrained(model_name)
 
-# 데이터 로드
-with open("emergency_qa.json", "r", encoding="utf-8") as f:
+with open("emergency_qa.json", "r", encoding="utf-8") as f: # 데이터 로드
     data = json.load(f)
 
-# 데이터 토큰화
-train_data = [{"input_ids": tokenizer(q["question"], return_tensors="pt")["input_ids"],
+train_data = [{"input_ids": tokenizer(q["question"], return_tensors="pt")["input_ids"], # 데이터 토큰화
                "labels": tokenizer(q["answer"], return_tensors="pt")["input_ids"]}
               for q in data]
 
-# 학습 설정
-training_args = TrainingArguments(
+training_args = TrainingArguments(   # 학습 설정
     output_dir="./fine_tuned_model",
     per_device_train_batch_size=4,
     num_train_epochs=3,
@@ -179,11 +172,9 @@ trainer = Trainer(
     train_dataset=train_data
 )
 
-# 학습 실행
-trainer.train()
+trainer.train() # 학습 실행
 
-# 파인튜닝된 모델 저장
-model.save_pretrained("./fine_tuned_emergency_model")
+model.save_pretrained("./fine_tuned_emergency_model")  # 파인튜닝된 모델 저장
 tokenizer.save_pretrained("./fine_tuned_emergency_model")
 
  
@@ -199,23 +190,18 @@ import numpy as np
 import json
 from sentence_transformers import SentenceTransformer
 
-# SBERT 기반 임베딩 모델 로드
-model = SentenceTransformer("snunlp/KR-SBERT-V40K-klueNLI-augSTS")
+model = SentenceTransformer("snunlp/KR-SBERT-V40K-klueNLI-augSTS") # SBERT 기반 임베딩 모델 로드
 
-# 데이터 로드
-with open("emergency_qa.json", "r", encoding="utf-8") as f:
+with open("emergency_qa.json", "r", encoding="utf-8") as f: # 데이터 로드
     data = json.load(f)
 
-# 임베딩 변환
-embeddings = np.array([model.encode(q["answer"]) for q in data])
+embeddings = np.array([model.encode(q["answer"]) for q in data]) # 임베딩 변환
 
-# Faiss 인덱스 생성
-d = embeddings.shape[1]
+d = embeddings.shape[1]   # Faiss 인덱스 생성
 index = faiss.IndexFlatL2(d)
 index.add(embeddings)
-
-# 저장
-faiss.write_index(index, "faiss_index.bin")
+ 
+faiss.write_index(index, "faiss_index.bin")  # 저장
 with open("texts.json", "w", encoding="utf-8") as f:
     json.dump(data, f, ensure_ascii=False, indent=4)
 
@@ -232,18 +218,15 @@ from transformers import AutoModelForCausalLM, AutoTokenizer
 from sentence_transformers import SentenceTransformer
 import json
 
-# 모델 및 토크나이저 로드
-model_path = "./fine_tuned_emergency_model"
+model_path = "./fine_tuned_emergency_model"  # 모델 및 토크나이저 로드
 tokenizer = AutoTokenizer.from_pretrained(model_path)
 model = AutoModelForCausalLM.from_pretrained(model_path)
 
-# Faiss 인덱스 로드
-index = faiss.read_index("faiss_index.bin")
+index = faiss.read_index("faiss_index.bin")  # Faiss 인덱스 로드
 with open("texts.json", "r", encoding="utf-8") as f:
     texts = json.load(f)
 
-# SBERT 임베딩 모델 로드
-embedding_model = SentenceTransformer("snunlp/KR-SBERT-V40K-klueNLI-augSTS")
+embedding_model = SentenceTransformer("snunlp/KR-SBERT-V40K-klueNLI-augSTS")  # SBERT 임베딩 모델 로드
 
 def search_and_generate(query):
     # 쿼리 벡터 변환
@@ -264,8 +247,8 @@ def search_and_generate(query):
 
     return tokenizer.decode(output[0], skip_special_tokens=True)
 
-# 테스트
-query = "허리를 다치면 어떻게 해?"
+
+query = "허리를 다치면 어떻게 해?"   # 테스트
 print(search_and_generate(query))
 
 
