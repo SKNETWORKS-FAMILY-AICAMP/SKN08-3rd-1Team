@@ -137,6 +137,7 @@ if response.status_code == 200:
         json.dump(data, f, ensure_ascii=False, indent=4)
 else:
     print("페이지 요청 실패", response.status_code)
+```
 
 
 
@@ -145,22 +146,26 @@ else:
   - KoAlpaca 등 오픈소스 LLM을 응급처치 QA 데이터로 추가 학습
   - 이를 통해 챗봇이 응급처치 관련 질문에 더 정확한 답변을 제공
 
-
+```python
 from transformers import AutoModelForCausalLM, AutoTokenizer, Trainer, TrainingArguments
 import json
 
-model_name = "beomi/KoAlpaca-7B" # 모델 및 토크나이저 로드
+# 모델 및 토크나이저 로드
+model_name = "beomi/KoAlpaca-7B" 
 tokenizer = AutoTokenizer.from_pretrained(model_name)
 model = AutoModelForCausalLM.from_pretrained(model_name)
 
-with open("emergency_qa.json", "r", encoding="utf-8") as f: # 데이터 로드
+# 데이터 로드
+with open("emergency_qa.json", "r", encoding="utf-8") as f: 
     data = json.load(f)
 
-train_data = [{"input_ids": tokenizer(q["question"], return_tensors="pt")["input_ids"], # 데이터 토큰화
+# 데이터 토큰화
+train_data = [{"input_ids": tokenizer(q["question"], return_tensors="pt")["input_ids"], 
                "labels": tokenizer(q["answer"], return_tensors="pt")["input_ids"]}
               for q in data]
 
-training_args = TrainingArguments(   # 학습 설정
+# 학습 설정
+training_args = TrainingArguments(   
     output_dir="./fine_tuned_model",
     per_device_train_batch_size=4,
     num_train_epochs=3,
@@ -174,12 +179,13 @@ trainer = Trainer(
     train_dataset=train_data
 )
 
-trainer.train() # 학습 실행
+ # 학습 실행
+trainer.train()
 
-model.save_pretrained("./fine_tuned_emergency_model")  # 파인튜닝된 모델 저장
+# 파인튜닝된 모델 저장
+model.save_pretrained("./fine_tuned_emergency_model")  
 tokenizer.save_pretrained("./fine_tuned_emergency_model")
-
- 
+ ```
 
 
   
@@ -187,26 +193,32 @@ tokenizer.save_pretrained("./fine_tuned_emergency_model")
   - SBERT를 사용해 응급처치 데이터를 벡터화하고 Faiss에 저장.
   - 사용자의 질문과 가장 유사한 응급처치 정보를 빠르게 검색 가능.
 
+```python
 import faiss
 import numpy as np
 import json
 from sentence_transformers import SentenceTransformer
 
-model = SentenceTransformer("snunlp/KR-SBERT-V40K-klueNLI-augSTS") # SBERT 기반 임베딩 모델 로드
+# SBERT 기반 임베딩 모델 로드
+model = SentenceTransformer("snunlp/KR-SBERT-V40K-klueNLI-augSTS") 
 
-with open("emergency_qa.json", "r", encoding="utf-8") as f: # 데이터 로드
+# 데이터 로드
+with open("emergency_qa.json", "r", encoding="utf-8") as f: 
     data = json.load(f)
 
-embeddings = np.array([model.encode(q["answer"]) for q in data]) # 임베딩 변환
+# 임베딩 변환
+embeddings = np.array([model.encode(q["answer"]) for q in data]) 
 
-d = embeddings.shape[1]   # Faiss 인덱스 생성
+ # Faiss 인덱스 생성
+d = embeddings.shape[1]  
 index = faiss.IndexFlatL2(d)
 index.add(embeddings)
- 
-faiss.write_index(index, "faiss_index.bin")  # 저장
+
+# 저장
+faiss.write_index(index, "faiss_index.bin")  
 with open("texts.json", "w", encoding="utf-8") as f:
     json.dump(data, f, ensure_ascii=False, indent=4)
-
+```
 
   
   
@@ -214,21 +226,26 @@ with open("texts.json", "w", encoding="utf-8") as f:
   - 준비한 데이터셋과 파인튜닝 전략을 사용하여 모델을 훈련합니다.
   - 학습 과정에서 설정된 하이퍼파라미터와 최적화된 알고리즘을 기반으로 모델 매개변수를 점진적으로 조정합니다.
 
+```python
 import faiss
 import numpy as np
 from transformers import AutoModelForCausalLM, AutoTokenizer
 from sentence_transformers import SentenceTransformer
 import json
 
-model_path = "./fine_tuned_emergency_model"  # 모델 및 토크나이저 로드
+ # 모델 및 토크나이저 로드
+model_path = "./fine_tuned_emergency_model" 
 tokenizer = AutoTokenizer.from_pretrained(model_path)
 model = AutoModelForCausalLM.from_pretrained(model_path)
 
-index = faiss.read_index("faiss_index.bin")  # Faiss 인덱스 로드
+# Faiss 인덱스 로드
+index = faiss.read_index("faiss_index.bin")  
 with open("texts.json", "r", encoding="utf-8") as f:
     texts = json.load(f)
 
-embedding_model = SentenceTransformer("snunlp/KR-SBERT-V40K-klueNLI-augSTS")  # SBERT 임베딩 모델 로드
+# SBERT 임베딩 모델 로드
+embedding_model = SentenceTransformer("snunlp/KR-SBERT-V40K-klueNLI-augSTS")  
+
 
 def search_and_generate(query):
     # 쿼리 벡터 변환
@@ -249,11 +266,10 @@ def search_and_generate(query):
 
     return tokenizer.decode(output[0], skip_special_tokens=True)
 
-
-query = "허리를 다치면 어떻게 해?"   # 테스트
+# 테스트
+query = "허리를 다치면 어떻게 해?"   
 print(search_and_generate(query))
-
-
+```
 
 <br><br><br>
 
