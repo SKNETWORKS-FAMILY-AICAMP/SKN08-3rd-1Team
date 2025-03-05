@@ -42,15 +42,12 @@ SKN08-3rd-1Team
       </td>
       <td align="center">
         <div>
-          <img src="<img width="175" alt="image" src="https://github.com/user-attachments/assets/8af94492-0e7f-49cc-9fad-c50debb251e9" />
-" width="200" height="200">
+          <img width="176" alt="image" src="https://github.com/user-attachments/assets/71e95e9c-aa6a-41b9-bdc2-c744ec05791b"/>
         </div>
       </td>
       <td align="center">
         <div>
-          <img src="<img width="<img width="308" alt="image" src="https://github.com/user-attachments/assets/ab687fec-9499-48bd-a5dd-d2d512ea1c81" />
-" />
-" width="200" height="200">
+          <img width="307" alt="image" src="https://github.com/user-attachments/assets/973b3a42-3bf1-478a-8f50-e03cc39e6742" />
         </div>
       </td>
     </tr>
