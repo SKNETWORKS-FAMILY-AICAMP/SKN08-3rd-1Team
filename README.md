@@ -113,6 +113,7 @@ SKN08-3rd-1Team
 - 크롤링을 통해 응급처치 데이터 수집 진행
 - Json으로 파일 저장
 
+```python
 import requests
 from bs4 import BeautifulSoup
 import json
@@ -131,7 +132,8 @@ if response.status_code == 200:
         content = article.find("p").text.strip()
         data.append({"question": title, "answer": content})
 
-    with open("emergency_qa.json", "w", encoding="utf-8") as f: # Json 파일에 저장
+# Json 파일에 저장
+    with open("emergency_qa.json", "w", encoding="utf-8") as f: 
         json.dump(data, f, ensure_ascii=False, indent=4)
 else:
     print("페이지 요청 실패", response.status_code)
